@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#e88db6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Stream Diary">
+  <title>Stream Diary</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <header class="app-header">
+      <div>
+        <p class="eyebrow">MY COZY STREAM SPACE</p>
+        <h1>Stream Diary <span class="title-heart" aria-hidden="true">♡</span></h1>
+        <p class="header-subtitle">A little place for every stream day ✦</p>
+      </div>
+      <span id="databaseStatus" class="database-status">Loading…</span>
+    </header>
+
+    <section class="stats-grid" aria-label="Streaming statistics">
+      <article class="stat-card">
+        <span class="stat-icon" aria-hidden="true">♡</span>
+        <span class="stat-label">All-time hours</span>
+        <strong id="totalHours">0h</strong>
+      </article>
+      <article class="stat-card">
+        <span class="stat-icon" aria-hidden="true">✦</span>
+        <span class="stat-label">This week</span>
+        <strong id="weekHours">0h</strong>
+      </article>
+      <article class="stat-card">
+        <span class="stat-icon" aria-hidden="true">☾</span>
+        <span class="stat-label">This month</span>
+        <strong id="monthHours">0h</strong>
+      </article>
+      <article class="stat-card">
+        <span class="stat-icon" aria-hidden="true">❀</span>
+        <span class="stat-label">Stream days</span>
+        <strong id="streamDays">0</strong>
+      </article>
+      <article class="stat-card">
+        <span class="stat-icon" aria-hidden="true">ෆ</span>
+        <span class="stat-label">Current streak</span>
+        <strong id="currentStreak">0 days</strong>
+      </article>
+    </section>
+
+    <section class="card calendar-card" aria-labelledby="calendarHeading">
+      <div class="calendar-title-row">
+        <button id="previousMonthButton" class="icon-button" type="button" aria-label="Previous month">‹</button>
+        <h2 id="calendarHeading">Calendar</h2>
+        <button id="nextMonthButton" class="icon-button" type="button" aria-label="Next month">›</button>
+      </div>
+      <div class="weekdays" aria-hidden="true">
+        <span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span>
+      </div>
+      <div id="calendarGrid" class="calendar-grid"></div>
+      <div class="calendar-legend">
+        <span><i class="legend-dot streamed"></i> Streamed</span>
+        <span><i class="legend-dot missed"></i> No stream</span>
+        <span><i class="legend-dot open"></i> Today / untracked</span>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="logHeading">
+      <div class="section-heading">
+        <div>
+          <p class="card-label">DAILY CHECK-IN</p>
+          <h2 id="logHeading">How did today go?</h2>
+        </div>
+        <button id="resetFormButton" class="text-button" type="button">Reset</button>
+      </div>
+
+      <form id="logForm">
+        <label class="field">
+          <span>Date</span>
+          <input id="logDate" type="date" required>
+        </label>
+        <label class="field">
+          <span>Status</span>
+          <select id="streamStatus">
+            <option value="streamed">♡ Streamed</option>
+            <option value="missed">☾ Did not stream</option>
+          </select>
+        </label>
+        <div id="durationFields" class="duration-fields">
+          <label class="field">
+            <span>Hours</span>
+            <input id="logHours" type="number" inputmode="numeric" min="0" max="24" step="1" value="0" required>
+          </label>
+          <label class="field">
+            <span>Minutes</span>
+            <input id="logMinutes" type="number" inputmode="numeric" min="0" max="59" step="1" value="0" required>
+          </label>
+        </div>
+        <label class="field">
+          <span>Little note <small>(optional)</small></span>
+          <input id="logNote" type="text" maxlength="120" placeholder="What did you stream today?">
+        </label>
+        <div class="form-actions">
+          <button class="button button-primary" type="submit">Save Log</button>
+          <button id="deleteLogButton" class="button button-ghost-danger" type="button" hidden>Delete Day</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="historyHeading">
+      <div class="section-heading">
+        <div>
+          <p class="card-label">RECENT MEMORIES</p>
+          <h2 id="historyHeading">Your stream diary</h2>
+        </div>
+      </div>
+      <div id="historyList" class="history-list"></div>
+    </section>
+
+    <section class="card" aria-labelledby="settingsHeading">
+      <div class="section-heading">
+        <div>
+          <p class="card-label">DATA & SETTINGS</p>
+          <h2 id="settingsHeading">Keep your memories safe</h2>
+        </div>
+      </div>
+
+      <label class="field">
+        <span>Tracking start date</span>
+        <input id="trackingStartDate" type="date">
+      </label>
+      <button id="saveSettingsButton" class="button button-secondary full-width" type="button">Save Start Date</button>
+
+      <div class="backup-grid">
+        <button id="exportBackupButton" class="button button-secondary" type="button">Export Backup</button>
+        <button id="importBackupButton" class="button button-secondary" type="button">Import Backup</button>
+        <button id="exportCsvButton" class="button button-secondary" type="button">Export CSV</button>
+        <input id="backupFileInput" type="file" accept="application/json,.json" hidden>
+      </div>
+
+      <p class="storage-note">Records stay in this browser database. Export a backup occasionally so you can restore them if Safari website data is cleared.</p>
+      <button id="clearAllButton" class="danger-link" type="button">Delete all streaming data</button>
+    </section>
+
+    <p id="statusMessage" class="status-message" role="status" aria-live="polite">Ready</p>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
