@@ -31,6 +31,11 @@
         <strong id="totalHours">0h</strong>
       </article>
       <article class="stat-card">
+        <span class="stat-icon" aria-hidden="true">✧</span>
+        <span class="stat-label">Overall Bits</span>
+        <strong id="totalBits">0</strong>
+      </article>
+      <article class="stat-card">
         <span class="stat-icon" aria-hidden="true">✦</span>
         <span class="stat-label">This week</span>
         <strong id="weekHours">0h</strong>
@@ -90,7 +95,7 @@
             <option value="missed">☾ Did not stream</option>
           </select>
         </label>
-        <div id="durationFields" class="duration-fields">
+        <div id="durationFields" class="duration-fields three-fields">
           <label class="field">
             <span>Hours</span>
             <input id="logHours" type="number" inputmode="numeric" min="0" max="24" step="1" value="0" required>
@@ -98,6 +103,10 @@
           <label class="field">
             <span>Minutes</span>
             <input id="logMinutes" type="number" inputmode="numeric" min="0" max="59" step="1" value="0" required>
+          </label>
+          <label class="field">
+            <span>Bits</span>
+            <input id="logBits" type="number" inputmode="numeric" min="0" step="1" value="0" required>
           </label>
         </div>
         <label class="field">

@@ -321,6 +321,10 @@ input:focus, select:focus {
   gap: 10px;
 }
 
+.duration-fields.three-fields {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .history-list { display: grid; gap: 9px; }
 
 .history-item {

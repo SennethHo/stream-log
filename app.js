@@ -39,10 +39,10 @@
 
   function cacheElements() {
     [
-      "databaseStatus", "totalHours", "weekHours", "monthHours", "streamDays",
+      "databaseStatus", "totalHours", "totalBits", "weekHours", "monthHours", "streamDays",
       "currentStreak", "calendarHeading", "calendarGrid", "previousMonthButton",
       "nextMonthButton", "logForm", "logDate", "streamStatus", "durationFields",
-      "logHours", "logMinutes",
+      "logHours", "logMinutes", "logBits",
       "logNote", "resetFormButton", "deleteLogButton", "historyList",
       "trackingStartDate", "saveSettingsButton", "exportBackupButton",
       "importBackupButton", "exportCsvButton", "backupFileInput",
@@ -146,7 +146,8 @@
     days = days.map(function (day) {
       return Object.assign({}, day, {
         status: day.status === "missed" ? "missed" : "streamed",
-        seconds: Number.isFinite(day.seconds) ? day.seconds : 0
+        seconds: Number.isFinite(day.seconds) ? day.seconds : 0,
+        bits: Number.isInteger(day.bits) && day.bits >= 0 ? day.bits : 0
       });
     });
     days.sort(function (a, b) { return b.date.localeCompare(a.date); });
@@ -178,8 +179,12 @@
     const totalSeconds = streamedDays.reduce(function (sum, day) {
       return sum + day.seconds;
     }, 0);
+    const totalBits = streamedDays.reduce(function (sum, day) {
+      return sum + day.bits;
+    }, 0);
 
     elements.totalHours.textContent = formatDuration(totalSeconds);
+    elements.totalBits.textContent = totalBits.toLocaleString();
     elements.weekHours.textContent = formatDuration(weekSeconds);
     elements.monthHours.textContent = formatDuration(monthSeconds);
     elements.streamDays.textContent = String(streamedDays.length);
@@ -266,12 +271,14 @@
       const totalMinutes = Math.round(record.seconds / 60);
       elements.logHours.value = String(Math.floor(totalMinutes / 60));
       elements.logMinutes.value = String(totalMinutes % 60);
+      elements.logBits.value = String(record.bits || 0);
       elements.logNote.value = record.note || "";
       elements.deleteLogButton.hidden = false;
     } else {
       elements.streamStatus.value = "streamed";
       elements.logHours.value = "0";
       elements.logMinutes.value = "0";
+      elements.logBits.value = "0";
       elements.logNote.value = "";
       elements.deleteLogButton.hidden = true;
     }
@@ -307,7 +314,8 @@
         duration.classList.add("missed");
         duration.textContent = "No stream";
       } else {
-        duration.textContent = formatDuration(day.seconds);
+        duration.textContent = formatDuration(day.seconds) +
+          (day.bits > 0 ? " · " + day.bits.toLocaleString() + " Bits" : "");
       }
 
       item.appendChild(date);
@@ -331,6 +339,7 @@
     const status = elements.streamStatus.value;
     const hours = Number(elements.logHours.value);
     const minutes = Number(elements.logMinutes.value);
+    const bits = Number(elements.logBits.value);
 
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
       setStatus("Select a valid date.", true);
@@ -356,11 +365,16 @@
       setStatus("Enter at least one minute of streaming time.", true);
       return;
     }
+    if (status === "streamed" && (!Number.isSafeInteger(bits) || bits < 0)) {
+      setStatus("Bits must be a whole number of 0 or more.", true);
+      return;
+    }
 
     await putDay({
       date: date,
       status: status,
       seconds: status === "streamed" ? (hours * 60 + minutes) * 60 : 0,
+      bits: status === "streamed" ? bits : 0,
       note: elements.logNote.value.trim(),
       updatedAt: new Date().toISOString()
     });
@@ -392,6 +406,7 @@
     elements.streamStatus.value = "streamed";
     elements.logHours.value = "0";
     elements.logMinutes.value = "0";
+    elements.logBits.value = "0";
     elements.logNote.value = "";
     elements.deleteLogButton.hidden = true;
     updateDurationVisibility();
@@ -402,6 +417,7 @@
     elements.durationFields.hidden = !didStream;
     elements.logHours.disabled = !didStream;
     elements.logMinutes.disabled = !didStream;
+    elements.logBits.disabled = !didStream;
   }
 
   async function saveSettings() {
@@ -424,7 +440,7 @@
   function exportBackup() {
     const backup = {
       app: "Stream Diary",
-      version: 2,
+      version: 3,
       exportedAt: new Date().toISOString(),
       trackingStartDate: trackingStartDate,
       days: days.slice().sort(function (a, b) { return a.date.localeCompare(b.date); })
@@ -447,14 +463,17 @@
       if (!backup || !Array.isArray(backup.days)) throw new Error("Invalid backup");
       const validatedDays = backup.days.map(function (day) {
         const status = day.status === "missed" ? "missed" : "streamed";
+        const bits = day.bits === undefined ? 0 : day.bits;
         if (!/^\d{4}-\d{2}-\d{2}$/.test(day.date) || !Number.isFinite(day.seconds) ||
-            (status === "streamed" && day.seconds <= 0) || day.seconds < 0) {
+            (status === "streamed" && day.seconds <= 0) || day.seconds < 0 ||
+            !Number.isSafeInteger(bits) || bits < 0) {
           throw new Error("Invalid record in backup");
         }
         return {
           date: day.date,
           status: status,
           seconds: status === "streamed" ? Math.round(day.seconds) : 0,
+          bits: status === "streamed" ? bits : 0,
           note: typeof day.note === "string" ? day.note.slice(0, 120) : "",
           updatedAt: new Date().toISOString()
         };
@@ -482,7 +501,7 @@
   }
 
   function exportCsv() {
-    const rows = [["Date", "Status", "Hours", "Minutes", "Total hours", "Note"]];
+    const rows = [["Date", "Status", "Hours", "Minutes", "Total hours", "Bits", "Note"]];
     days.slice().sort(function (a, b) { return a.date.localeCompare(b.date); }).forEach(function (day) {
       const totalMinutes = Math.round(day.seconds / 60);
       rows.push([
@@ -491,6 +510,7 @@
         Math.floor(totalMinutes / 60),
         totalMinutes % 60,
         (day.seconds / 3600).toFixed(2),
+        day.bits,
         day.note || ""
       ]);
     });

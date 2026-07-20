@@ -1,4 +1,4 @@
-const CACHE_NAME = "stream-diary-v3";
+const CACHE_NAME = "stream-diary-v4";
 const APP_FILES = [
   "./",
   "./index.html",

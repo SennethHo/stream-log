@@ -6,6 +6,7 @@ Stream Diary is a personal, offline-capable streaming-hours tracker with a soft 
 
 - Manual streamed/did-not-stream status for each date.
 - Manual total-hours entry and editing for streamed days.
+- Daily Bits entry with an automatic overall Bits total.
 - Monthly calendar showing streamed and missed days.
 - Weekly and monthly totals, streamed-day count and current streak.
 - Notes for the game, topic or title streamed.
