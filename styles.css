@@ -292,9 +292,22 @@ input, select {
   border: 1px solid var(--border);
   border-radius: 15px;
   outline: none;
-  color: var(--text);
+  color: #4b3040;
+  -webkit-text-fill-color: #4b3040;
+  color-scheme: light;
   background: rgba(255, 250, 253, 0.96);
   font-size: 16px;
+}
+
+input::placeholder {
+  color: #9a7f8f;
+  -webkit-text-fill-color: #9a7f8f;
+  opacity: 1;
+}
+
+select option {
+  color: #4b3040;
+  background: #fffafd;
 }
 
 input:focus, select:focus {
@@ -376,6 +389,16 @@ input:focus, select:focus {
   }
 
   body { background: linear-gradient(180deg, #21161f 0%, #1c151e 50%, #211a2b 100%); }
+  input, select {
+    border-color: #ead3df;
+    color: #432b39;
+    -webkit-text-fill-color: #432b39;
+    background: #fff8fc;
+  }
+  input::placeholder {
+    color: #8d7181;
+    -webkit-text-fill-color: #8d7181;
+  }
   .calendar-day.streamed { color: #ffd7e9; }
   .calendar-day.missed { color: #e2d5ff; }
 }
