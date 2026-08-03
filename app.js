@@ -10,6 +10,7 @@
   let database;
   let days = [];
   let selectedEntryId = null;
+  let selectedCalendarDate = null;
   let trackingStartDate = todayKey();
   let calendarMonth = new Date();
   calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
@@ -46,6 +47,7 @@
       "nextMonthButton", "logForm", "logDate", "streamStatus", "durationFields",
       "logHours", "logMinutes", "logBits",
       "logNote", "resetFormButton", "deleteLogButton", "historyList",
+      "dayRecordsCard", "dayRecordsHeading", "dayRecordsSummary", "dayRecordsList", "addDayEntryButton", "closeDayRecordsButton",
       "trackingStartDate", "saveSettingsButton", "exportBackupButton",
       "importBackupButton", "exportCsvButton", "backupFileInput",
       "clearAllButton", "statusMessage"
@@ -75,6 +77,8 @@
     elements.backupFileInput.addEventListener("change", importBackup);
     elements.exportCsvButton.addEventListener("click", exportCsv);
     elements.clearAllButton.addEventListener("click", clearAllData);
+    elements.addDayEntryButton.addEventListener("click", startNewEntryForSelectedDay);
+    elements.closeDayRecordsButton.addEventListener("click", closeDayRecords);
   }
 
   function openDatabase() {
@@ -178,6 +182,7 @@
     renderStats();
     renderCalendar();
     renderHistory();
+    renderSelectedDayRecords();
   }
 
   function renderStats() {
@@ -260,6 +265,7 @@
 
       if (date.getMonth() !== month) button.classList.add("other-month");
       if (dateKey === today) button.classList.add("today");
+      if (dateKey === selectedCalendarDate) button.classList.add("selected");
       if (dateKey > today) button.classList.add("future");
       if (record && record.status === "streamed") {
         button.classList.add("streamed");
@@ -286,8 +292,74 @@
   }
 
   function selectCalendarDate(dateKey) {
+    selectedCalendarDate = dateKey;
+    renderSelectedDayRecords();
+    elements.dayRecordsCard.hidden = false;
+    elements.dayRecordsCard.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function renderSelectedDayRecords() {
+    if (!selectedCalendarDate) {
+      elements.dayRecordsCard.hidden = true;
+      return;
+    }
+
+    const dateEntries = days.filter(function (entry) {
+      return entry.date === selectedCalendarDate;
+    });
+    const summary = summariseDateEntries(dateEntries);
+
+    elements.dayRecordsCard.hidden = false;
+    elements.dayRecordsHeading.textContent = formatLongDate(selectedCalendarDate);
+    elements.dayRecordsList.textContent = "";
+
+    if (!dateEntries.length) {
+      elements.dayRecordsSummary.textContent = "No records saved for this day.";
+      const empty = document.createElement("div");
+      empty.className = "empty-state";
+      empty.textContent = "No stream entries yet. Add the first session for this date ♡";
+      elements.dayRecordsList.appendChild(empty);
+      return;
+    }
+
+    const streamedCount = dateEntries.filter(function (entry) { return entry.status === "streamed"; }).length;
+    elements.dayRecordsSummary.textContent = streamedCount + (streamedCount === 1 ? " session" : " sessions") +
+      " · " + formatDuration(summary ? summary.seconds : 0) +
+      ((summary && summary.bits > 0) ? " · " + summary.bits.toLocaleString() + " Bits" : "");
+
+    dateEntries.forEach(function (entry, index) {
+      const item = document.createElement("button");
+      item.type = "button";
+      item.className = "day-record-item";
+
+      const title = document.createElement("span");
+      title.className = "day-record-title";
+      title.textContent = entry.status === "missed" ? "No stream" : "Session " + (index + 1);
+
+      const detail = document.createElement("span");
+      detail.className = "day-record-detail";
+      detail.textContent = entry.status === "missed" ? "Did not stream" :
+        formatDuration(entry.seconds) + (entry.bits > 0 ? " · " + entry.bits.toLocaleString() + " Bits" : "");
+
+      item.appendChild(title);
+      item.appendChild(detail);
+
+      if (entry.note) {
+        const note = document.createElement("span");
+        note.className = "day-record-note";
+        note.textContent = entry.note;
+        item.appendChild(note);
+      }
+
+      item.addEventListener("click", function () { selectHistoryEntry(entry.id); });
+      elements.dayRecordsList.appendChild(item);
+    });
+  }
+
+  function startNewEntryForSelectedDay() {
+    if (!selectedCalendarDate) return;
     selectedEntryId = null;
-    elements.logDate.value = dateKey;
+    elements.logDate.value = selectedCalendarDate;
     elements.streamStatus.value = "streamed";
     elements.logHours.value = "0";
     elements.logMinutes.value = "0";
@@ -296,6 +368,11 @@
     elements.deleteLogButton.hidden = true;
     updateDurationVisibility();
     elements.logForm.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
+  function closeDayRecords() {
+    selectedCalendarDate = null;
+    elements.dayRecordsCard.hidden = true;
   }
 
   function selectHistoryEntry(id) {

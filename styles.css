@@ -428,3 +428,31 @@ input:focus, select:focus {
 @media (min-width: 600px) {
   .stats-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+
+
+.day-records-summary {
+  margin: 5px 0 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.day-records-list { display: grid; gap: 9px; }
+
+.day-record-item {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 12px;
+  width: 100%;
+  padding: 13px;
+  border: 1px solid rgba(241, 219, 230, 0.9);
+  border-radius: 16px;
+  color: var(--text);
+  background: var(--neutral-soft);
+  text-align: left;
+}
+
+.day-record-title { font-weight: 850; }
+.day-record-detail { color: var(--green); font-weight: 800; }
+.day-record-note { grid-column: 1 / -1; color: var(--muted); font-size: 0.78rem; }
+.day-add-button { margin-top: 13px; }
+.calendar-day.selected { box-shadow: 0 0 0 3px rgba(223, 117, 167, 0.22); }
