@@ -2,12 +2,14 @@
   "use strict";
 
   const DB_NAME = "stream-tracker-db";
-  const DB_VERSION = 1;
-  const DAY_STORE = "days";
+  const DB_VERSION = 2;
+  const LEGACY_DAY_STORE = "days";
+  const ENTRY_STORE = "entries";
   const SETTINGS_STORE = "settings";
 
   let database;
   let days = [];
+  let selectedEntryId = null;
   let trackingStartDate = todayKey();
   let calendarMonth = new Date();
   calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth(), 1);
@@ -81,8 +83,22 @@
 
       request.onupgradeneeded = function () {
         const db = request.result;
-        if (!db.objectStoreNames.contains(DAY_STORE)) {
-          db.createObjectStore(DAY_STORE, { keyPath: "date" });
+        if (!db.objectStoreNames.contains(ENTRY_STORE)) {
+          db.createObjectStore(ENTRY_STORE, { keyPath: "id" });
+        }
+        if (request.oldVersion < 2 && db.objectStoreNames.contains(LEGACY_DAY_STORE)) {
+          const legacyStore = request.transaction.objectStore(LEGACY_DAY_STORE);
+          const entryStore = request.transaction.objectStore(ENTRY_STORE);
+          legacyStore.openCursor().onsuccess = function (event) {
+            const cursor = event.target.result;
+            if (!cursor) return;
+            const legacy = cursor.value;
+            entryStore.put(Object.assign({}, legacy, {
+              id: createEntryId(legacy.date),
+              createdAt: legacy.updatedAt || new Date().toISOString()
+            }));
+            cursor.continue();
+          };
         }
         if (!db.objectStoreNames.contains(SETTINGS_STORE)) {
           db.createObjectStore(SETTINGS_STORE, { keyPath: "key" });
@@ -106,7 +122,7 @@
   }
 
   function getAllDays() {
-    return transact(DAY_STORE, "readonly", function (store) { return store.getAll(); });
+    return transact(ENTRY_STORE, "readonly", function (store) { return store.getAll(); });
   }
 
   function getSetting(key) {
@@ -114,11 +130,11 @@
   }
 
   function putDay(day) {
-    return transact(DAY_STORE, "readwrite", function (store) { return store.put(day); });
+    return transact(ENTRY_STORE, "readwrite", function (store) { return store.put(day); });
   }
 
-  function deleteDay(date) {
-    return transact(DAY_STORE, "readwrite", function (store) { return store.delete(date); });
+  function deleteEntry(id) {
+    return transact(ENTRY_STORE, "readwrite", function (store) { return store.delete(id); });
   }
 
   function putSetting(key, value) {
@@ -150,7 +166,11 @@
         bits: Number.isInteger(day.bits) && day.bits >= 0 ? day.bits : 0
       });
     });
-    days.sort(function (a, b) { return b.date.localeCompare(a.date); });
+    days.sort(function (a, b) {
+      const dateOrder = b.date.localeCompare(a.date);
+      if (dateOrder) return dateOrder;
+      return String(b.createdAt || b.updatedAt || "").localeCompare(String(a.createdAt || a.updatedAt || ""));
+    });
     renderAll();
   }
 
@@ -187,7 +207,9 @@
     elements.totalBits.textContent = totalBits.toLocaleString();
     elements.weekHours.textContent = formatDuration(weekSeconds);
     elements.monthHours.textContent = formatDuration(monthSeconds);
-    elements.streamDays.textContent = String(streamedDays.length);
+    elements.streamDays.textContent = String(new Set(streamedDays.map(function (day) {
+      return day.date;
+    })).size);
     const streak = calculateStreak();
     elements.currentStreak.textContent = streak + (streak === 1 ? " day" : " days");
   }
@@ -222,14 +244,15 @@
     const firstDay = new Date(year, month, 1);
     const mondayIndex = (firstDay.getDay() + 6) % 7;
     const gridStart = new Date(year, month, 1 - mondayIndex);
-    const records = new Map(days.map(function (day) { return [day.date, day]; }));
+    const records = groupEntriesByDate();
     const today = todayKey();
 
     for (let index = 0; index < 42; index += 1) {
       const date = new Date(gridStart);
       date.setDate(gridStart.getDate() + index);
       const dateKey = toDateKey(date);
-      const record = records.get(dateKey);
+      const dateEntries = records.get(dateKey) || [];
+      const record = summariseDateEntries(dateEntries);
       const button = document.createElement("button");
       button.type = "button";
       button.className = "calendar-day";
@@ -263,28 +286,32 @@
   }
 
   function selectCalendarDate(dateKey) {
-    const record = days.find(function (day) { return day.date === dateKey; });
+    selectedEntryId = null;
     elements.logDate.value = dateKey;
-
-    if (record) {
-      elements.streamStatus.value = record.status;
-      const totalMinutes = Math.round(record.seconds / 60);
-      elements.logHours.value = String(Math.floor(totalMinutes / 60));
-      elements.logMinutes.value = String(totalMinutes % 60);
-      elements.logBits.value = String(record.bits || 0);
-      elements.logNote.value = record.note || "";
-      elements.deleteLogButton.hidden = false;
-    } else {
-      elements.streamStatus.value = "streamed";
-      elements.logHours.value = "0";
-      elements.logMinutes.value = "0";
-      elements.logBits.value = "0";
-      elements.logNote.value = "";
-      elements.deleteLogButton.hidden = true;
-    }
-
+    elements.streamStatus.value = "streamed";
+    elements.logHours.value = "0";
+    elements.logMinutes.value = "0";
+    elements.logBits.value = "0";
+    elements.logNote.value = "";
+    elements.deleteLogButton.hidden = true;
     updateDurationVisibility();
+    elements.logForm.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 
+  function selectHistoryEntry(id) {
+    const record = days.find(function (day) { return day.id === id; });
+    if (!record) return;
+
+    selectedEntryId = record.id;
+    elements.logDate.value = record.date;
+    elements.streamStatus.value = record.status;
+    const totalMinutes = Math.round(record.seconds / 60);
+    elements.logHours.value = String(Math.floor(totalMinutes / 60));
+    elements.logMinutes.value = String(totalMinutes % 60);
+    elements.logBits.value = String(record.bits || 0);
+    elements.logNote.value = record.note || "";
+    elements.deleteLogButton.hidden = false;
+    updateDurationVisibility();
     elements.logForm.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 
@@ -328,7 +355,7 @@
         item.appendChild(note);
       }
 
-      item.addEventListener("click", function () { selectCalendarDate(day.date); });
+      item.addEventListener("click", function () { selectHistoryEntry(day.id); });
       elements.historyList.appendChild(item);
     });
   }
@@ -370,13 +397,17 @@
       return;
     }
 
+    const wasEditing = Boolean(selectedEntryId);
+    const now = new Date().toISOString();
     await putDay({
+      id: selectedEntryId || createEntryId(date),
       date: date,
       status: status,
       seconds: status === "streamed" ? (hours * 60 + minutes) * 60 : 0,
       bits: status === "streamed" ? bits : 0,
       note: elements.logNote.value.trim(),
-      updatedAt: new Date().toISOString()
+      createdAt: selectedEntryId ? (days.find(function (day) { return day.id === selectedEntryId; }) || {}).createdAt || now : now,
+      updatedAt: now
     });
 
     if (date < trackingStartDate) {
@@ -387,21 +418,22 @@
 
     await refreshData();
     resetLogForm();
-    setStatus("Streaming log saved.");
+    setStatus(wasEditing ? "Streaming entry updated." : "Streaming entry added.");
   }
 
   async function deleteSelectedLog() {
-    const date = elements.logDate.value;
-    if (!days.some(function (day) { return day.date === date; })) return;
+    const entry = days.find(function (day) { return day.id === selectedEntryId; });
+    if (!entry) return;
 
-    if (!window.confirm("Delete the streaming record for " + formatLongDate(date) + "?")) return;
-    await deleteDay(date);
+    if (!window.confirm("Delete this streaming entry for " + formatLongDate(entry.date) + "?")) return;
+    await deleteEntry(entry.id);
     await refreshData();
     resetLogForm();
-    setStatus("Streaming log deleted.");
+    setStatus("Streaming entry deleted.");
   }
 
   function resetLogForm() {
+    selectedEntryId = null;
     elements.logDate.value = todayKey();
     elements.streamStatus.value = "streamed";
     elements.logHours.value = "0";
@@ -440,7 +472,7 @@
   function exportBackup() {
     const backup = {
       app: "Stream Diary",
-      version: 3,
+      version: 4,
       exportedAt: new Date().toISOString(),
       trackingStartDate: trackingStartDate,
       days: days.slice().sort(function (a, b) { return a.date.localeCompare(b.date); })
@@ -470,18 +502,20 @@
           throw new Error("Invalid record in backup");
         }
         return {
+          id: typeof day.id === "string" && day.id ? day.id : createEntryId(day.date),
           date: day.date,
           status: status,
           seconds: status === "streamed" ? Math.round(day.seconds) : 0,
           bits: status === "streamed" ? bits : 0,
           note: typeof day.note === "string" ? day.note.slice(0, 120) : "",
+          createdAt: typeof day.createdAt === "string" ? day.createdAt : new Date().toISOString(),
           updatedAt: new Date().toISOString()
         };
       });
 
       if (!window.confirm("Import this backup and replace the current streaming records?")) return;
 
-      await clearStore(DAY_STORE);
+      await clearStore(ENTRY_STORE);
       for (const day of validatedDays) {
         await putDay(day);
       }
@@ -529,7 +563,7 @@
     if (!window.confirm("Permanently delete all streaming records and settings on this device?")) return;
     if (!window.confirm("This cannot be undone unless you exported a backup. Continue?")) return;
 
-    await clearStore(DAY_STORE);
+    await clearStore(ENTRY_STORE);
     await clearStore(SETTINGS_STORE);
     trackingStartDate = todayKey();
     await putSetting("trackingStartDate", trackingStartDate);
@@ -566,6 +600,33 @@
     const hours = seconds / 3600;
     if (hours >= 10) return hours.toFixed(1).replace(".0", "") + "h";
     return hours.toFixed(1) + "h";
+  }
+
+  function groupEntriesByDate() {
+    const grouped = new Map();
+    days.forEach(function (entry) {
+      if (!grouped.has(entry.date)) grouped.set(entry.date, []);
+      grouped.get(entry.date).push(entry);
+    });
+    return grouped;
+  }
+
+  function summariseDateEntries(entries) {
+    if (!entries.length) return null;
+    const streamed = entries.filter(function (entry) { return entry.status === "streamed"; });
+    if (!streamed.length) return { status: "missed", seconds: 0, bits: 0 };
+    return {
+      status: "streamed",
+      seconds: streamed.reduce(function (sum, entry) { return sum + entry.seconds; }, 0),
+      bits: streamed.reduce(function (sum, entry) { return sum + entry.bits; }, 0)
+    };
+  }
+
+  function createEntryId(date) {
+    if (window.crypto && typeof window.crypto.randomUUID === "function") {
+      return date + "-" + window.crypto.randomUUID();
+    }
+    return date + "-" + Date.now() + "-" + Math.random().toString(36).slice(2);
   }
 
   function formatLongDate(dateKey) {
