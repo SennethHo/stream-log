@@ -42,8 +42,8 @@
 
   function cacheElements() {
     [
-      "databaseStatus", "totalHours", "totalBits", "weekHours", "monthHours", "streamDays",
-      "currentStreak", "calendarHeading", "calendarGrid", "previousMonthButton",
+      "databaseStatus", "totalBits", "weekHours", "monthHours", "streamDays",
+      "calendarHeading", "calendarGrid", "previousMonthButton",
       "nextMonthButton", "logForm", "logDate", "streamStatus", "durationFields",
       "logHours", "logMinutes", "logBits",
       "logNote", "resetFormButton", "deleteLogButton", "historyList",
@@ -201,41 +201,19 @@
     const monthSeconds = streamedDays
       .filter(function (day) { return day.date.indexOf(monthPrefix) === 0; })
       .reduce(function (sum, day) { return sum + day.seconds; }, 0);
-    const totalSeconds = streamedDays.reduce(function (sum, day) {
-      return sum + day.seconds;
-    }, 0);
-    const totalBits = streamedDays.reduce(function (sum, day) {
+    const monthStreamedDays = streamedDays.filter(function (day) {
+      return day.date.indexOf(monthPrefix) === 0;
+    });
+    const monthBits = monthStreamedDays.reduce(function (sum, day) {
       return sum + day.bits;
     }, 0);
 
-    elements.totalHours.textContent = formatDuration(totalSeconds);
-    elements.totalBits.textContent = totalBits.toLocaleString();
+    elements.totalBits.textContent = monthBits.toLocaleString();
     elements.weekHours.textContent = formatDuration(weekSeconds);
     elements.monthHours.textContent = formatDuration(monthSeconds);
-    elements.streamDays.textContent = String(new Set(streamedDays.map(function (day) {
+    elements.streamDays.textContent = String(new Set(monthStreamedDays.map(function (day) {
       return day.date;
     })).size);
-    const streak = calculateStreak();
-    elements.currentStreak.textContent = streak + (streak === 1 ? " day" : " days");
-  }
-
-  function calculateStreak() {
-    const streamedDates = new Set(days
-      .filter(function (day) { return day.status === "streamed"; })
-      .map(function (day) { return day.date; }));
-    let cursor = new Date();
-    cursor.setHours(0, 0, 0, 0);
-
-    if (!streamedDates.has(toDateKey(cursor))) {
-      cursor.setDate(cursor.getDate() - 1);
-    }
-
-    let streak = 0;
-    while (streamedDates.has(toDateKey(cursor))) {
-      streak += 1;
-      cursor.setDate(cursor.getDate() - 1);
-    }
-    return streak;
   }
 
   function renderCalendar() {
