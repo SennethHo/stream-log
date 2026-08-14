@@ -42,7 +42,7 @@
 
   function cacheElements() {
     [
-      "databaseStatus", "totalBits", "weekHours", "monthHours", "streamDays",
+      "databaseStatus", "totalBits", "bitsLabel", "weekHours", "monthHours", "monthHoursLabel", "streamDays", "streamDaysLabel",
       "calendarHeading", "calendarGrid", "previousMonthButton",
       "nextMonthButton", "logForm", "logDate", "streamStatus", "durationFields",
       "logHours", "logMinutes", "logBits",
@@ -59,10 +59,12 @@
   function bindEvents() {
     elements.previousMonthButton.addEventListener("click", function () {
       calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
+      renderStats();
       renderCalendar();
     });
     elements.nextMonthButton.addEventListener("click", function () {
       calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1);
+      renderStats();
       renderCalendar();
     });
     elements.logForm.addEventListener("submit", saveManualLog);
@@ -192,22 +194,29 @@
     weekStart.setHours(0, 0, 0, 0);
     weekStart.setDate(weekStart.getDate() - mondayOffset);
     const weekStartKey = toDateKey(weekStart);
-    const monthPrefix = now.getFullYear() + "-" + pad(now.getMonth() + 1);
+
+    // Monthly cards follow whichever month is currently shown in the calendar.
+    const selectedYear = calendarMonth.getFullYear();
+    const selectedMonth = calendarMonth.getMonth();
+    const monthPrefix = selectedYear + "-" + pad(selectedMonth + 1);
+    const monthName = calendarMonth.toLocaleDateString(undefined, { month: "long" });
 
     const streamedDays = days.filter(function (day) { return day.status === "streamed"; });
     const weekSeconds = streamedDays
       .filter(function (day) { return day.date >= weekStartKey; })
       .reduce(function (sum, day) { return sum + day.seconds; }, 0);
-    const monthSeconds = streamedDays
-      .filter(function (day) { return day.date.indexOf(monthPrefix) === 0; })
-      .reduce(function (sum, day) { return sum + day.seconds; }, 0);
     const monthStreamedDays = streamedDays.filter(function (day) {
       return day.date.indexOf(monthPrefix) === 0;
     });
+    const monthSeconds = monthStreamedDays
+      .reduce(function (sum, day) { return sum + day.seconds; }, 0);
     const monthBits = monthStreamedDays.reduce(function (sum, day) {
       return sum + day.bits;
     }, 0);
 
+    elements.bitsLabel.textContent = monthName + " bits";
+    elements.monthHoursLabel.textContent = monthName + " hours";
+    elements.streamDaysLabel.textContent = "Stream days in " + monthName;
     elements.totalBits.textContent = monthBits.toLocaleString();
     elements.weekHours.textContent = formatDuration(weekSeconds);
     elements.monthHours.textContent = formatDuration(monthSeconds);
